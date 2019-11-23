@@ -20,6 +20,8 @@ http://jmcauley.ucsd.edu/data/amazon/
     - all words
     - emotion words only
     - exclude emotion words
+    - review length
+    - sentence lengths
 
 ### Packages
 
@@ -31,7 +33,7 @@ In your virtual environment, install `numpy`, `nltk`, and `scikit-learn`.
 python analyze.py <file_name>
 ```
 
-`file_name`: reviews_helpfulness file name (.json.gz format)
+`file_name`: reviews file name (.json.gz format)
 
 ### Example
 
