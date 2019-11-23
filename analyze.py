@@ -6,6 +6,7 @@ import time
 from enum import Enum
 
 import numpy as np
+from nltk import pos_tag
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import sent_tokenize, word_tokenize
@@ -14,6 +15,12 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
 from sklearn.naive_bayes import MultinomialNB
+
+# Run Logistic Regression
+RUN_LOG_REG = True
+
+# Run Naive Bayes
+RUN_NAIVE_BAYES = True
 
 # maximum number of reviews
 MAX_REVIEWS = 10000
@@ -52,6 +59,7 @@ class RunOption(Enum):
     EXCLUDE_EMOTION_WORDS = 3
     REVIEW_LENGTH = 4
     SENTENCE_LENGTH = 5
+    POS = 6
 
 
 class Algo(Enum):
@@ -145,6 +153,24 @@ def get_features_words(reviews, run_option):
     return features
 
 
+def get_features_pos(reviews, run_option=None):
+    reviews_tags = []
+
+    for review in reviews:
+        review_tags = []
+        sentences = sent_tokenize(review)
+        for sentence in sentences:
+            word_tags = pos_tag(word_tokenize(sentence))
+            _, tags = map(list, zip(*word_tags))
+            review_tags.extend(tags)
+        reviews_tags.append(' '.join(review_tags))
+
+    vectorizer = CountVectorizer()
+    features = vectorizer.fit_transform(reviews_tags)
+
+    return features
+
+
 def get_features_lengths(reviews, run_option):
     features = []
 
@@ -161,12 +187,16 @@ def get_features_lengths(reviews, run_option):
 
 
 def get_features(reviews, run_option):
-    if run_option is RunOption.ALL_WORDS or \
-            run_option is RunOption.EMOTION_WORDS or \
-            run_option is RunOption.EXCLUDE_EMOTION_WORDS:
-        features = get_features_words(reviews, run_option)
-    else:
-        features = get_features_lengths(reviews, run_option)
+    options = {
+        RunOption.ALL_WORDS: get_features_words,
+        RunOption.EMOTION_WORDS: get_features_words,
+        RunOption.EXCLUDE_EMOTION_WORDS: get_features_words,
+        RunOption.REVIEW_LENGTH: get_features_lengths,
+        RunOption.SENTENCE_LENGTH: get_features_lengths,
+        RunOption.POS: get_features_pos,
+    }
+
+    features = options[run_option](reviews, run_option)
 
     return features
 
@@ -220,37 +250,41 @@ def naive_bayes(title, x_train, x_test, y_train, y_test):
 
 
 def print_results(title, model_accuracy, algo):
-    h1 = '=' * 94
-    h2 = '-' * 94
+    h1 = '=' * 113
+    h2 = '-' * 113
 
-    print('\n\n{:^94}'.format(file_name + ' (' + title + ')'))
+    print('\n\n{:^113}'.format(file_name + ' (' + title + ')'))
     print(h1)
-    print('{:^1}{:^92}{:^1}'.format('|', 'Accuracy %', '|'))
+    print('{:^1}{:^111}{:^1}'.format('|', 'Accuracy %', '|'))
     print(h2)
-    print('{:^1}{:^16}{:^3}{:^16}{:^3}{:^16}{:^3}{:^16}{:^3}{:^16}{:^1}'.format('|', 'all words',
-                                                                                '|', 'emotions only',
-                                                                                '|', 'exclude emotions',
-                                                                                '|', 'review length',
-                                                                                '|', 'sentence length', '|'))
+    print('{:^1}{:^16}{:^3}{:^16}{:^3}{:^16}{:^3}{:^16}{:^3}{:^16}{:^3}{:^16}{:^1}'
+          .format('|', 'all words',
+                  '|', 'emotions only',
+                  '|', 'exclude emotions',
+                  '|', 'review length',
+                  '|', 'sentence length',
+                  '|', 'part of speech', '|'))
     print(h1)
 
-    fmt = '{:^1}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^1}'
+    fmt = '{:^1}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^1}'
     print(fmt.format('|', model_accuracy[RunOption.ALL_WORDS][algo] * 100, '|',
                      model_accuracy[RunOption.EMOTION_WORDS][algo] * 100, '|',
                      model_accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100, '|',
                      model_accuracy[RunOption.REVIEW_LENGTH][algo] * 100, '|',
-                     model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100, '|', ))
+                     model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100, '|',
+                     model_accuracy[RunOption.POS][algo] * 100, '|', ))
     print(h1)
 
 
 def save_results(file_name, category, model_accuracy, algo):
-    entry = '{},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f}\n'.format(
+    entry = '{},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f}\n'.format(
         category,
         model_accuracy[RunOption.ALL_WORDS][algo] * 100,
         model_accuracy[RunOption.EMOTION_WORDS][algo] * 100,
         model_accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100,
         model_accuracy[RunOption.REVIEW_LENGTH][algo] * 100,
-        model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100)
+        model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100,
+        model_accuracy[RunOption.POS][algo] * 100)
 
     with open(file_name, mode='a+') as f:
         f.seek(0)
@@ -266,24 +300,23 @@ def save_results(file_name, category, model_accuracy, algo):
 
         f.seek(0)
         f.truncate()
-        f.write('category,all words,emotions only,exclude emotions,review length,sentence length\n')
+        f.write('category,all words,emotions only,exclude emotions,review length,sentence length,part of speech\n')
         f.writelines(lines)
 
 
 def build_model(reviews, title, run_option):
     print('\n[' + title + '] Building models...')
-    results = {
-        Algo.LOG_REG: {'clf': None, 'x_test': None, 'y_test': None},
-        Algo.NAIVE_BAYES: {'clf': None, 'x_test': None, 'y_test': None},
-    }
+    results = {}
 
     x_train, x_test, y_train, y_test = get_data_sets(reviews, run_option)
 
-    print('[' + title + '] Running Logistic Regression...')
-    results[Algo.LOG_REG] = logistic_regression(title, x_train, x_test, y_train, y_test)
+    if RUN_LOG_REG:
+        print('[' + title + '] Running Logistic Regression...')
+        results[Algo.LOG_REG] = logistic_regression(title, x_train, x_test, y_train, y_test)
 
-    print('[' + title + '] Running Naive Bayes...')
-    results[Algo.NAIVE_BAYES] = naive_bayes(title, x_train, x_test, y_train, y_test)
+    if RUN_NAIVE_BAYES:
+        print('[' + title + '] Running Naive Bayes...')
+        results[Algo.NAIVE_BAYES] = naive_bayes(title, x_train, x_test, y_train, y_test)
 
     return results
 
@@ -327,6 +360,7 @@ results = {
     RunOption.EXCLUDE_EMOTION_WORDS: build_model(reviews, 'exclude emotion words', RunOption.EXCLUDE_EMOTION_WORDS),
     RunOption.REVIEW_LENGTH: build_model(reviews, 'review length', RunOption.REVIEW_LENGTH),
     RunOption.SENTENCE_LENGTH: build_model(reviews, 'sentence length', RunOption.SENTENCE_LENGTH),
+    RunOption.POS: build_model(reviews, 'part of speech', RunOption.POS),
 }
 
 # calculate accuracy
@@ -336,18 +370,23 @@ model_accuracy = {
     RunOption.EXCLUDE_EMOTION_WORDS: calculate_accuracy(results[RunOption.EXCLUDE_EMOTION_WORDS]),
     RunOption.REVIEW_LENGTH: calculate_accuracy(results[RunOption.REVIEW_LENGTH]),
     RunOption.SENTENCE_LENGTH: calculate_accuracy(results[RunOption.SENTENCE_LENGTH]),
+    RunOption.POS: calculate_accuracy(results[RunOption.POS]),
 }
 
 # print results
-print_results('Logistic Regression', model_accuracy, Algo.LOG_REG)
-print_results('Naive Bayes', model_accuracy, Algo.NAIVE_BAYES)
+if RUN_LOG_REG:
+    print_results('Logistic Regression', model_accuracy, Algo.LOG_REG)
+if RUN_NAIVE_BAYES:
+    print_results('Naive Bayes', model_accuracy, Algo.NAIVE_BAYES)
 
 # save results
 start_idx = file_name.find('_')
 end_idx = file_name.find('_5')
 category = file_name[start_idx + 1:end_idx].replace('_', ' ')
-save_results('log_reg.csv', category, model_accuracy, Algo.LOG_REG)
-save_results('naive_bayes.csv', category, model_accuracy, Algo.NAIVE_BAYES)
+if RUN_LOG_REG:
+    save_results('log_reg.csv', category, model_accuracy, Algo.LOG_REG)
+if RUN_NAIVE_BAYES:
+    save_results('naive_bayes.csv', category, model_accuracy, Algo.NAIVE_BAYES)
 
 # elapsed time
 print('\n\nElapsed time:', round(time.perf_counter() - start), 's')

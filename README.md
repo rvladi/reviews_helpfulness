@@ -20,8 +20,9 @@ http://jmcauley.ucsd.edu/data/amazon/
     - all words
     - emotion words only
     - exclude emotion words
-    - review length
-    - sentence lengths
+    - part of speech
+- review length
+- sentence lengths
 
 ### Packages
 
