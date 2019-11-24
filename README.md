@@ -31,14 +31,15 @@ In your virtual environment, install `numpy`, `nltk`, and `scikit-learn`.
 ### Usage
 
 ```
-python analyze.py <file_name>
+python analyze.py <path>
 ```
 
-`file_name`: reviews file name (.json.gz format)
+`path`: reviews path (directory or file in .json.gz format)
 
-### Example
+### Examples
 
 ```
+python analyze.py reviews
 python analyze.py reviews/reviews_Automotive_5.json.gz
 ```
 

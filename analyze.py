@@ -1,6 +1,7 @@
 import argparse
 import gzip
 import json
+import os
 import string
 import time
 from enum import Enum
@@ -45,7 +46,7 @@ stop_words = set(stopwords.words('english'))
 
 
 def load_emotion_words(file_name):
-    with open(file_name, 'r') as f:
+    with open(file_name, mode='r') as f:
         return set(stemmer.stem(line.strip()) for line in f)
 
 
@@ -87,15 +88,13 @@ def exclude_emotion_words(tokens):
     return [token for token in tokens if token not in emotion_words]
 
 
-def load_reviews(file_name):
-    reviews = []
-
+def load_reviews_from_file(file_name, reviews, max_reviews):
     total_helpful = 0
     total_not_helpful = 0
 
     with gzip.open(file_name, mode='r') as f:
         for count, line in enumerate(f):
-            if count == MAX_REVIEWS:
+            if count == max_reviews:
                 break
             entry = json.loads(line)
             review = entry['reviewText']
@@ -109,6 +108,27 @@ def load_reviews(file_name):
                 helpfulness = 'not_helpful'
                 total_not_helpful += 1
             reviews.append((review, helpfulness))
+
+    return total_helpful, total_not_helpful
+
+
+def load_reviews(path):
+    reviews = []
+
+    total_helpful = 0
+    total_not_helpful = 0
+
+    if os.path.isdir(path):
+        file_names = [path + os.sep + file_name for file_name in os.listdir(path) if file_name.endswith('.json.gz')]
+        max_reviews = MAX_REVIEWS // len(file_names)
+    else:
+        file_names = [path]
+        max_reviews = MAX_REVIEWS
+
+    for file_name in file_names:
+        helpful, not_helpful = load_reviews_from_file(file_name, reviews, max_reviews)
+        total_helpful += helpful
+        total_not_helpful += not_helpful
 
     print('Total number of helpful reviews: {} ({:.1f}%)'.format(total_helpful, 100 * total_helpful / len(reviews)))
     print('Total number of not helpful reviews: {} ({:.1f}%)'.format(total_not_helpful,
@@ -257,11 +277,11 @@ def naive_bayes(title, x_train, x_test, y_train, y_test):
     return {'clf': classifier, 'x_test': x_test, 'y_test': y_test}
 
 
-def print_results(title, model_accuracy, algo):
+def print_results(title, path, model_accuracy, algo):
     h1 = '=' * 113
     h2 = '-' * 113
 
-    print('\n\n{:^113}'.format(file_name + ' (' + title + ')'))
+    print('\n\n{:^113}'.format(path + ' (' + title + ')'))
     print(h1)
     print('{:^1}{:^111}{:^1}'.format('|', 'Accuracy %', '|'))
     print(h2)
@@ -352,14 +372,14 @@ start = time.perf_counter()
 
 # parameters
 parser = argparse.ArgumentParser()
-parser.add_argument('file_name', type=str, help='reviews file name')
+parser.add_argument('path', type=str, help='reviews path')
 args = parser.parse_args()
-file_name = args.file_name
-print('\nReviews file name: ' + file_name)
+path = args.path
+print('\nReviews path: ' + path)
 
 # load reviews [(review, helpfulness), ...]
 print('\nLoading reviews...')
-reviews = load_reviews(file_name)
+reviews = load_reviews(path)
 
 # build models
 results = {
@@ -383,14 +403,17 @@ model_accuracy = {
 
 # print results
 if RUN_LOG_REG:
-    print_results('Logistic Regression', model_accuracy, Algo.LOG_REG)
+    print_results('Logistic Regression', path, model_accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:
-    print_results('Naive Bayes', model_accuracy, Algo.NAIVE_BAYES)
+    print_results('Naive Bayes', path, model_accuracy, Algo.NAIVE_BAYES)
 
 # save results
-start_idx = file_name.find('_')
-end_idx = file_name.find('_5')
-category = file_name[start_idx + 1:end_idx].replace('_', ' ')
+if os.path.isdir(path):
+    category = 'All Categories'
+else:
+    start_idx = path.find('_')
+    end_idx = path.find('_5')
+    category = path[start_idx + 1:end_idx].replace('_', ' ')
 if RUN_LOG_REG:
     save_results('log_reg.csv', category, model_accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:

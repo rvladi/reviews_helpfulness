@@ -4,6 +4,9 @@ source venv/bin/activate
 
 mkdir -p logs
 
+printf '\nProcessing All Categories...\n'
+python analyze.py reviews > logs/All_Categories.log 2> /dev/null
+
 printf '\nProcessing Amazon Instant Video...\n'
 python analyze.py reviews/reviews_Amazon_Instant_Video_5.json.gz > logs/Amazon_Instant_Video.log 2> /dev/null
 
