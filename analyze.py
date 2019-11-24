@@ -90,6 +90,9 @@ def exclude_emotion_words(tokens):
 def load_reviews(file_name):
     reviews = []
 
+    total_helpful = 0
+    total_not_helpful = 0
+
     with gzip.open(file_name, mode='r') as f:
         for count, line in enumerate(f):
             if count == MAX_REVIEWS:
@@ -101,10 +104,15 @@ def load_reviews(file_name):
             total_votes = helpful[1]
             if helpful_votes * 2 > total_votes > 1:
                 helpfulness = 'helpful'
+                total_helpful += 1
             else:
                 helpfulness = 'not_helpful'
+                total_not_helpful += 1
             reviews.append((review, helpfulness))
 
+    print('Total number of helpful reviews: {} ({:.1f}%)'.format(total_helpful, 100 * total_helpful / len(reviews)))
+    print('Total number of not helpful reviews: {} ({:.1f}%)'.format(total_not_helpful,
+                                                                     100 * total_not_helpful / len(reviews)))
     return reviews
 
 

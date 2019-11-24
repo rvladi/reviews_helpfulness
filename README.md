@@ -43,3 +43,8 @@ python analyze.py reviews/reviews_Automotive_5.json.gz
 ```
 
 **Note:** Download large datasets locally but don't push them to the repository.
+
+### Results
+
+- Logistic Regression: `log_reg.csv`
+- Naive Bayes: `naive_bayes.csv`
