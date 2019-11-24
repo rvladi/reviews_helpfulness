@@ -18,7 +18,7 @@ http://jmcauley.ucsd.edu/data/amazon/
 
 - unigram counts
     - all words
-    - emotion words only
+    - emotion words only ([Scherer, 2005](https://pdfs.semanticscholar.org/b8e6/98e8a7d968f3dba9040e2f5fafe7e5a2b095.pdf))
     - exclude emotion words
     - part of speech
 - review length
