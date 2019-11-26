@@ -34,8 +34,8 @@ In your virtual environment, install `numpy`, `nltk`, and `scikit-learn`.
 python analyze.py <path> [<test_path>]
 ```
 
-`path`: reviews path (directory or file in .json.gz format)
-`test_path`: test reviews path (optional)
+- `path`: reviews path (directory or file in .json.gz format)
+- `test_path`: test reviews path (optional)
 
 ### Examples
 
