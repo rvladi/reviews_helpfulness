@@ -12,25 +12,28 @@ from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn import metrics
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV, cross_val_score, train_test_split
 from sklearn.naive_bayes import MultinomialNB
 
-# Run Logistic Regression
+# N-gram frequencies (versus counts)
+NGRAM_FREQUENCIES = True
+
+# run Naive Bayes
+RUN_NAIVE_BAYES = True
+
+# run Logistic Regression
 RUN_LOG_REG = True
 
-# Run Naive Bayes
-RUN_NAIVE_BAYES = True
+# maximum number of iterations for Logistic Regression
+MAX_ITERATIONS = 100
 
 # maximum number of reviews
 MAX_REVIEWS = 10000
 
 # number of sentences per review
 NUM_SENTENCES = 100
-
-# maximum number of iterations for Logistic Regression
-MAX_ITERATIONS = 100
 
 # punctuation table
 punctuation_table = str.maketrans('', '', string.punctuation)
@@ -112,9 +115,7 @@ def load_reviews_from_file(file_name, reviews, max_reviews):
     return total_helpful, total_not_helpful
 
 
-def load_reviews(path):
-    reviews = []
-
+def load_reviews(path, reviews):
     total_helpful = 0
     total_not_helpful = 0
 
@@ -130,10 +131,10 @@ def load_reviews(path):
         total_helpful += helpful
         total_not_helpful += not_helpful
 
-    print('Total number of helpful reviews: {} ({:.1f}%)'.format(total_helpful, 100 * total_helpful / len(reviews)))
+    total = total_helpful + total_not_helpful
+    print('Total number of helpful reviews: {} ({:.1f}%)'.format(total_helpful, 100 * total_helpful / total))
     print('Total number of not helpful reviews: {} ({:.1f}%)'.format(total_not_helpful,
-                                                                     100 * total_not_helpful / len(reviews)))
-    return reviews
+                                                                     100 * total_not_helpful / total))
 
 
 def preprocess(reviews, run_option):
@@ -169,15 +170,23 @@ def preprocess(reviews, run_option):
     return preprocessed_reviews
 
 
+def get_vectorizer(max_features=None):
+    if NGRAM_FREQUENCIES:
+        vectorizer = TfidfVectorizer(max_features=max_features)
+    else:
+        vectorizer = CountVectorizer(max_features=max_features)
+    return vectorizer
+
+
 def get_features_words(reviews, run_option):
     reviews = preprocess(reviews, run_option)
-    vocabulary_size = len(set(token for review in reviews for token in word_tokenize(review)))
 
+    vocabulary_size = len(set(token for review in reviews for token in word_tokenize(review)))
     rank_threshold = 100
     max_features = vocabulary_size - rank_threshold if vocabulary_size > rank_threshold else None
-    vectorizer = CountVectorizer(max_features=max_features)
-    features = vectorizer.fit_transform(reviews)
 
+    vectorizer = get_vectorizer(max_features)
+    features = vectorizer.fit_transform(reviews)
     return features
 
 
@@ -193,9 +202,8 @@ def get_features_pos(reviews, run_option=None):
             review_tags.extend(tags)
         reviews_tags.append(' '.join(review_tags))
 
-    vectorizer = CountVectorizer()
+    vectorizer = get_vectorizer()
     features = vectorizer.fit_transform(reviews_tags)
-
     return features
 
 
@@ -205,7 +213,7 @@ def get_features_lengths(reviews, run_option):
     for review in reviews:
         if run_option is RunOption.REVIEW_LENGTH:
             features.append([len(review)])
-        else:
+        else:  # run_option is RunOption.SENTENCE_LENGTH
             slen = [0] * NUM_SENTENCES  # sentence lengths of the review
             sentences = sent_tokenize(review)[:NUM_SENTENCES]  # list of sentences
             slen[:len(sentences)] = (len(sentence) for sentence in sentences)
@@ -225,18 +233,23 @@ def get_features(reviews, run_option):
     }
 
     features = options[run_option](reviews, run_option)
-
     return features
 
 
-def get_data_sets(reviews, run_option):
+def get_data_sets(reviews, num_model_reviews, run_option):
     reviews_text, labels = map(list, zip(*reviews))
 
     # extract features
     features = get_features(reviews_text, run_option)
 
     # split reviews into train and test sets
-    x_train, x_test, y_train, y_test = train_test_split(features, labels, train_size=0.9, random_state=2797)
+    if num_model_reviews < len(reviews):
+        x_train = features[:num_model_reviews]
+        x_test = features[num_model_reviews:]
+        y_train = labels[:num_model_reviews]
+        y_test = labels[num_model_reviews:]
+    else:
+        x_train, x_test, y_train, y_test = train_test_split(features, labels, train_size=0.9, random_state=2797)
 
     return x_train, x_test, y_train, y_test
 
@@ -277,11 +290,16 @@ def naive_bayes(title, x_train, x_test, y_train, y_test):
     return {'clf': classifier, 'x_test': x_test, 'y_test': y_test}
 
 
-def print_results(title, path, model_accuracy, algo):
+def print_results(title, path, test_path, model_accuracy, algo):
     h1 = '=' * 113
     h2 = '-' * 113
 
-    print('\n\n{:^113}'.format(path + ' (' + title + ')'))
+    print('\n\n{:^113}'.format(title))
+    if test_path:
+        print('{:^113}'.format('Model file name: ' + path))
+        print('{:^113}'.format('Test file name: ' + test_path))
+    else:
+        print('{:^113}'.format('File name: ' + path))
     print(h1)
     print('{:^1}{:^111}{:^1}'.format('|', 'Accuracy %', '|'))
     print(h2)
@@ -304,9 +322,10 @@ def print_results(title, path, model_accuracy, algo):
     print(h1)
 
 
-def save_results(file_name, category, model_accuracy, algo):
-    entry = '{},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f}\n'.format(
-        category,
+def save_results(file_name, model_category, test_category, model_accuracy, algo):
+    entry = '{},{},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f}\n'.format(
+        model_category,
+        test_category,
         model_accuracy[RunOption.ALL_WORDS][algo] * 100,
         model_accuracy[RunOption.EMOTION_WORDS][algo] * 100,
         model_accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100,
@@ -319,7 +338,7 @@ def save_results(file_name, category, model_accuracy, algo):
         lines = f.readlines()[1:]
 
         for i in range(len(lines)):
-            if lines[i].startswith(category + ','):
+            if lines[i].startswith(model_category + ',' + test_category + ','):
                 lines[i] = entry
                 break
         else:
@@ -328,15 +347,17 @@ def save_results(file_name, category, model_accuracy, algo):
 
         f.seek(0)
         f.truncate()
-        f.write('category,all words,emotions only,exclude emotions,review length,sentence length,part of speech\n')
+        f.write('model category,test category,'
+                'all words,emotions only,exclude emotions,'
+                'review length,sentence length,part of speech\n')
         f.writelines(lines)
 
 
-def build_model(reviews, title, run_option):
+def build_model(reviews, num_model_reviews, title, run_option):
     print('\n[' + title + '] Building models...')
     results = {}
 
-    x_train, x_test, y_train, y_test = get_data_sets(reviews, run_option)
+    x_train, x_test, y_train, y_test = get_data_sets(reviews, num_model_reviews, run_option)
 
     if RUN_LOG_REG:
         print('[' + title + '] Running Logistic Regression...')
@@ -373,22 +394,33 @@ start = time.perf_counter()
 # parameters
 parser = argparse.ArgumentParser()
 parser.add_argument('path', type=str, help='reviews path')
+parser.add_argument('test_path', type=str, nargs='?', default='', help='test reviews path (optional)')
 args = parser.parse_args()
 path = args.path
+test_path = args.test_path
 print('\nReviews path: ' + path)
+print('Test reviews path: ' + test_path)
 
-# load reviews [(review, helpfulness), ...]
+# load reviews
 print('\nLoading reviews...')
-reviews = load_reviews(path)
+reviews = []
+load_reviews(path, reviews)
+num_model_reviews = len(reviews)
+
+# load test reviews
+if test_path:
+    print('\nLoading test reviews...')
+    load_reviews(test_path, reviews)
 
 # build models
 results = {
-    RunOption.ALL_WORDS: build_model(reviews, 'all words', RunOption.ALL_WORDS),
-    RunOption.EMOTION_WORDS: build_model(reviews, 'emotion words only', RunOption.EMOTION_WORDS),
-    RunOption.EXCLUDE_EMOTION_WORDS: build_model(reviews, 'exclude emotion words', RunOption.EXCLUDE_EMOTION_WORDS),
-    RunOption.REVIEW_LENGTH: build_model(reviews, 'review length', RunOption.REVIEW_LENGTH),
-    RunOption.SENTENCE_LENGTH: build_model(reviews, 'sentence length', RunOption.SENTENCE_LENGTH),
-    RunOption.POS: build_model(reviews, 'part of speech', RunOption.POS),
+    RunOption.ALL_WORDS: build_model(reviews, num_model_reviews, 'all words', RunOption.ALL_WORDS),
+    RunOption.EMOTION_WORDS: build_model(reviews, num_model_reviews, 'emotion words only', RunOption.EMOTION_WORDS),
+    RunOption.EXCLUDE_EMOTION_WORDS: build_model(reviews, num_model_reviews, 'exclude emotion words',
+                                                 RunOption.EXCLUDE_EMOTION_WORDS),
+    RunOption.REVIEW_LENGTH: build_model(reviews, num_model_reviews, 'review length', RunOption.REVIEW_LENGTH),
+    RunOption.SENTENCE_LENGTH: build_model(reviews, num_model_reviews, 'sentence length', RunOption.SENTENCE_LENGTH),
+    RunOption.POS: build_model(reviews, num_model_reviews, 'part of speech', RunOption.POS),
 }
 
 # calculate accuracy
@@ -403,21 +435,28 @@ model_accuracy = {
 
 # print results
 if RUN_LOG_REG:
-    print_results('Logistic Regression', path, model_accuracy, Algo.LOG_REG)
+    print_results('Logistic Regression', path, test_path, model_accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:
-    print_results('Naive Bayes', path, model_accuracy, Algo.NAIVE_BAYES)
+    print_results('Naive Bayes', path, test_path, model_accuracy, Algo.NAIVE_BAYES)
 
 # save results
 if os.path.isdir(path):
-    category = 'All Categories'
+    model_category = 'All Categories'
 else:
     start_idx = path.find('_')
     end_idx = path.find('_5')
-    category = path[start_idx + 1:end_idx].replace('_', ' ')
+    model_category = path[start_idx + 1:end_idx].replace('_', ' ')
+
+test_category = model_category
+if test_path:
+    start_idx = path.find('_')
+    end_idx = path.find('_5')
+    test_category = test_path[start_idx + 1:end_idx].replace('_', ' ')
+
 if RUN_LOG_REG:
-    save_results('log_reg.csv', category, model_accuracy, Algo.LOG_REG)
+    save_results('log_reg.csv', model_category, test_category, model_accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:
-    save_results('naive_bayes.csv', category, model_accuracy, Algo.NAIVE_BAYES)
+    save_results('naive_bayes.csv', model_category, test_category, model_accuracy, Algo.NAIVE_BAYES)
 
 # elapsed time
 print('\n\nElapsed time:', round(time.perf_counter() - start), 's')
