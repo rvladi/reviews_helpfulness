@@ -1,27 +1,27 @@
 model category,test category,all words,emotions only,exclude emotions,review length,sentence length,part of speech
-All Categories,All Categories,78.4,77.5,78.4,77.8,77.6,77.8
-Amazon Instant Video,Amazon Instant Video,88.9,89.1,88.9,88.9,89.1,88.9
-Apps for Android,Apps for Android,89.5,89.4,89.5,89.6,83.0,89.6
-Automotive,Automotive,86.1,86.0,86.1,86.1,84.1,86.1
-Baby,Baby,77.2,77.1,77.2,77.2,75.2,77.2
+All Categories,All Categories,78.4,77.8,78.4,77.8,77.6,77.8
+Amazon Instant Video,Amazon Instant Video,88.9,89.0,88.9,88.9,89.1,88.9
+Apps for Android,Apps for Android,89.5,89.6,89.5,89.6,83.0,89.6
+Automotive,Automotive,86.1,86.1,86.1,86.1,84.1,86.1
+Baby,Baby,77.2,77.2,77.2,77.2,75.2,77.2
 Beauty,Beauty,80.8,80.9,80.8,81.0,79.4,81.0
-Books,Books,73.3,73.1,73.1,73.2,72.1,73.2
-CDs and Vinyl,CDs and Vinyl,66.9,58.4,67.0,56.3,62.5,56.3
+Books,Books,73.3,72.8,73.1,73.2,72.1,73.2
+CDs and Vinyl,CDs and Vinyl,66.9,58.2,67.1,56.3,62.5,56.3
 Cell Phones and Accessories,Cell Phones and Accessories,84.1,84.0,84.1,84.0,85.7,84.0
 Clothing Shoes and Jewelry,Clothing Shoes and Jewelry,86.7,86.7,86.7,86.7,82.5,86.7
-Digital Music,Digital Music,60.3,57.6,60.3,56.9,60.5,56.9
-Electronics,Electronics,68.2,65.2,68.1,64.4,69.5,64.4
-Grocery and Gourmet Food,Grocery and Gourmet Food,79.2,79.3,79.2,79.2,75.2,79.2
-Health and Personal Care,Health and Personal Care,82.5,82.2,82.5,82.4,79.8,82.4
-Home and Kitchen,Home and Kitchen,74.0,73.3,74.0,73.9,75.0,73.9
-Kindle Store,Kindle Store,78.9,78.6,78.9,78.9,75.3,78.9
-Movies and TV,Movies and TV,72.8,72.6,72.9,72.6,72.1,72.6
+Digital Music,Digital Music,60.3,57.9,60.3,56.9,60.5,56.9
+Electronics,Electronics,68.1,64.8,68.1,64.4,69.5,64.4
+Grocery and Gourmet Food,Grocery and Gourmet Food,79.2,79.2,79.2,79.2,75.2,79.2
+Health and Personal Care,Health and Personal Care,82.5,82.4,82.5,82.4,79.8,82.4
+Home and Kitchen,Home and Kitchen,74.0,74.0,74.0,73.9,75.0,73.9
+Kindle Store,Kindle Store,78.9,78.8,78.9,78.9,75.3,78.9
+Movies and TV,Movies and TV,72.9,72.6,72.9,72.6,72.1,72.6
 Musical Instruments,Musical Instruments,84.8,84.8,84.8,84.8,83.5,84.8
-Office Products,Office Products,83.7,83.6,83.7,83.7,81.0,83.7
+Office Products,Office Products,83.7,83.7,83.7,83.7,81.0,83.7
 Patio Lawn and Garden,Patio Lawn and Garden,78.7,78.7,78.7,78.7,77.5,78.7
-Pet Supplies,Pet Supplies,85.9,86.0,85.9,85.9,82.8,85.9
+Pet Supplies,Pet Supplies,85.9,85.9,85.9,85.9,82.8,85.9
 Sports and Outdoors,Sports and Outdoors,86.0,86.0,86.0,86.0,82.0,86.0
-Tools and Home Improvement,Tools and Home Improvement,71.7,67.7,71.2,66.3,73.4,68.9
-Toys and Games,Toys and Games,75.6,75.5,75.6,75.6,76.1,75.6
-Video Games,Electronics,66.9,66.9,66.9,67.0,71.5,67.0
-Video Games,Video Games,69.8,69.5,69.8,69.8,67.2,69.8
+Tools and Home Improvement,Tools and Home Improvement,66.8,66.9,66.8,66.3,73.4,66.3
+Toys and Games,Toys and Games,75.6,75.6,75.6,75.6,76.1,75.6
+Video Games,Electronics,66.9,66.8,66.9,67.0,71.5,67.0
+Video Games,Video Games,69.8,69.7,69.8,69.8,67.2,69.8

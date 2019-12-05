@@ -1,4 +1,5 @@
 import argparse
+import concurrent
 import gzip
 import json
 import os
@@ -63,7 +64,7 @@ class RunOption(Enum):
     EXCLUDE_EMOTION_WORDS = 3
     REVIEW_LENGTH = 4
     SENTENCE_LENGTH = 5
-    POS = 6
+    PART_OF_SPEECH = 6
 
 
 class Algo(Enum):
@@ -229,7 +230,7 @@ def get_features(reviews, run_option):
         RunOption.EXCLUDE_EMOTION_WORDS: get_features_words,
         RunOption.REVIEW_LENGTH: get_features_lengths,
         RunOption.SENTENCE_LENGTH: get_features_lengths,
-        RunOption.POS: get_features_pos,
+        RunOption.PART_OF_SPEECH: get_features_pos,
     }
 
     features = options[run_option](reviews, run_option)
@@ -262,7 +263,7 @@ def logistic_regression(title, x_train, x_test, y_train, y_test):
 
     # create grid search using 5-fold cross-validation
     log_reg = LogisticRegression(solver='liblinear', max_iter=MAX_ITERATIONS)
-    grid_obj = GridSearchCV(log_reg, hyperparameters, scoring='accuracy', cv=5, n_jobs=-1)
+    grid_obj = GridSearchCV(log_reg, hyperparameters, scoring='accuracy', cv=5, n_jobs=1)
     grid_obj.fit(X=x_train, y=y_train)
 
     # retrieve the best classifier
@@ -281,7 +282,7 @@ def naive_bayes(title, x_train, x_test, y_train, y_test):
     classifier.fit(x_train, y_train)
 
     # 5-fold cross-validation
-    scores = cross_val_score(classifier, x_train, y_train, scoring='accuracy', cv=5, n_jobs=-1)
+    scores = cross_val_score(classifier, x_train, y_train, scoring='accuracy', cv=5, n_jobs=1)
 
     # accuracy score on the dev sets
     accuracy = np.mean(scores)
@@ -290,7 +291,7 @@ def naive_bayes(title, x_train, x_test, y_train, y_test):
     return {'clf': classifier, 'x_test': x_test, 'y_test': y_test}
 
 
-def print_results(title, path, test_path, model_accuracy, algo):
+def print_results(title, path, test_path, accuracy, algo):
     h1 = '=' * 113
     h2 = '-' * 113
 
@@ -313,25 +314,25 @@ def print_results(title, path, test_path, model_accuracy, algo):
     print(h1)
 
     fmt = '{:^1}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^3}{:^16.1f}{:^1}'
-    print(fmt.format('|', model_accuracy[RunOption.ALL_WORDS][algo] * 100, '|',
-                     model_accuracy[RunOption.EMOTION_WORDS][algo] * 100, '|',
-                     model_accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100, '|',
-                     model_accuracy[RunOption.REVIEW_LENGTH][algo] * 100, '|',
-                     model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100, '|',
-                     model_accuracy[RunOption.POS][algo] * 100, '|', ))
+    print(fmt.format('|', accuracy[RunOption.ALL_WORDS][algo] * 100, '|',
+                     accuracy[RunOption.EMOTION_WORDS][algo] * 100, '|',
+                     accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100, '|',
+                     accuracy[RunOption.REVIEW_LENGTH][algo] * 100, '|',
+                     accuracy[RunOption.SENTENCE_LENGTH][algo] * 100, '|',
+                     accuracy[RunOption.PART_OF_SPEECH][algo] * 100, '|', ))
     print(h1)
 
 
-def save_results(file_name, model_category, test_category, model_accuracy, algo):
+def save_results(file_name, model_category, test_category, accuracy, algo):
     entry = '{},{},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f},{:^4.1f}\n'.format(
         model_category,
         test_category,
-        model_accuracy[RunOption.ALL_WORDS][algo] * 100,
-        model_accuracy[RunOption.EMOTION_WORDS][algo] * 100,
-        model_accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100,
-        model_accuracy[RunOption.REVIEW_LENGTH][algo] * 100,
-        model_accuracy[RunOption.SENTENCE_LENGTH][algo] * 100,
-        model_accuracy[RunOption.POS][algo] * 100)
+        accuracy[RunOption.ALL_WORDS][algo] * 100,
+        accuracy[RunOption.EMOTION_WORDS][algo] * 100,
+        accuracy[RunOption.EXCLUDE_EMOTION_WORDS][algo] * 100,
+        accuracy[RunOption.REVIEW_LENGTH][algo] * 100,
+        accuracy[RunOption.SENTENCE_LENGTH][algo] * 100,
+        accuracy[RunOption.PART_OF_SPEECH][algo] * 100)
 
     with open(file_name, mode='a+') as f:
         f.seek(0)
@@ -354,7 +355,6 @@ def save_results(file_name, model_category, test_category, model_accuracy, algo)
 
 
 def build_model(reviews, num_model_reviews, title, run_option):
-    print('\n[' + title + '] Building models...')
     results = {}
 
     x_train, x_test, y_train, y_test = get_data_sets(reviews, num_model_reviews, run_option)
@@ -412,32 +412,58 @@ if test_path:
     print('\nLoading test reviews...')
     load_reviews(test_path, reviews)
 
+print()
+
 # build models
-results = {
-    RunOption.ALL_WORDS: build_model(reviews, num_model_reviews, 'all words', RunOption.ALL_WORDS),
-    RunOption.EMOTION_WORDS: build_model(reviews, num_model_reviews, 'emotion words only', RunOption.EMOTION_WORDS),
-    RunOption.EXCLUDE_EMOTION_WORDS: build_model(reviews, num_model_reviews, 'exclude emotion words',
-                                                 RunOption.EXCLUDE_EMOTION_WORDS),
-    RunOption.REVIEW_LENGTH: build_model(reviews, num_model_reviews, 'review length', RunOption.REVIEW_LENGTH),
-    RunOption.SENTENCE_LENGTH: build_model(reviews, num_model_reviews, 'sentence length', RunOption.SENTENCE_LENGTH),
-    RunOption.POS: build_model(reviews, num_model_reviews, 'part of speech', RunOption.POS),
-}
+with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+    futures = [
+        executor.submit(build_model, reviews, num_model_reviews, 'all words', RunOption.ALL_WORDS),
+        executor.submit(build_model, reviews, num_model_reviews, 'emotion words only', RunOption.EMOTION_WORDS),
+        executor.submit(build_model, reviews, num_model_reviews, 'exclude emotion words',
+                        RunOption.EXCLUDE_EMOTION_WORDS),
+        executor.submit(build_model, reviews, num_model_reviews, 'review length', RunOption.REVIEW_LENGTH),
+        executor.submit(build_model, reviews, num_model_reviews, 'sentence length', RunOption.SENTENCE_LENGTH),
+        executor.submit(build_model, reviews, num_model_reviews, 'part of speech', RunOption.PART_OF_SPEECH),
+    ]
+
+    concurrent.futures.wait(futures)
+
+    results = {
+        RunOption.ALL_WORDS: futures[0].result(),
+        RunOption.EMOTION_WORDS: futures[1].result(),
+        RunOption.EXCLUDE_EMOTION_WORDS: futures[2].result(),
+        RunOption.REVIEW_LENGTH: futures[3].result(),
+        RunOption.SENTENCE_LENGTH: futures[4].result(),
+        RunOption.PART_OF_SPEECH: futures[5].result(),
+    }
 
 # calculate accuracy
-model_accuracy = {
-    RunOption.ALL_WORDS: calculate_accuracy(results[RunOption.ALL_WORDS]),
-    RunOption.EMOTION_WORDS: calculate_accuracy(results[RunOption.EMOTION_WORDS]),
-    RunOption.EXCLUDE_EMOTION_WORDS: calculate_accuracy(results[RunOption.EXCLUDE_EMOTION_WORDS]),
-    RunOption.REVIEW_LENGTH: calculate_accuracy(results[RunOption.REVIEW_LENGTH]),
-    RunOption.SENTENCE_LENGTH: calculate_accuracy(results[RunOption.SENTENCE_LENGTH]),
-    RunOption.POS: calculate_accuracy(results[RunOption.POS]),
-}
+with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+    futures = [
+        executor.submit(calculate_accuracy, results[RunOption.ALL_WORDS]),
+        executor.submit(calculate_accuracy, results[RunOption.EMOTION_WORDS]),
+        executor.submit(calculate_accuracy, results[RunOption.EXCLUDE_EMOTION_WORDS]),
+        executor.submit(calculate_accuracy, results[RunOption.REVIEW_LENGTH]),
+        executor.submit(calculate_accuracy, results[RunOption.SENTENCE_LENGTH]),
+        executor.submit(calculate_accuracy, results[RunOption.PART_OF_SPEECH]),
+    ]
+
+    concurrent.futures.wait(futures)
+
+    accuracy = {
+        RunOption.ALL_WORDS: futures[0].result(),
+        RunOption.EMOTION_WORDS: futures[1].result(),
+        RunOption.EXCLUDE_EMOTION_WORDS: futures[2].result(),
+        RunOption.REVIEW_LENGTH: futures[3].result(),
+        RunOption.SENTENCE_LENGTH: futures[4].result(),
+        RunOption.PART_OF_SPEECH: futures[5].result(),
+    }
 
 # print results
 if RUN_LOG_REG:
-    print_results('Logistic Regression', path, test_path, model_accuracy, Algo.LOG_REG)
+    print_results('Logistic Regression', path, test_path, accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:
-    print_results('Naive Bayes', path, test_path, model_accuracy, Algo.NAIVE_BAYES)
+    print_results('Naive Bayes', path, test_path, accuracy, Algo.NAIVE_BAYES)
 
 # save results
 if os.path.isdir(path):
@@ -454,9 +480,9 @@ if test_path:
     test_category = test_path[start_idx + 1:end_idx].replace('_', ' ')
 
 if RUN_LOG_REG:
-    save_results('log_reg.csv', model_category, test_category, model_accuracy, Algo.LOG_REG)
+    save_results('log_reg.csv', model_category, test_category, accuracy, Algo.LOG_REG)
 if RUN_NAIVE_BAYES:
-    save_results('naive_bayes.csv', model_category, test_category, model_accuracy, Algo.NAIVE_BAYES)
+    save_results('naive_bayes.csv', model_category, test_category, accuracy, Algo.NAIVE_BAYES)
 
 # elapsed time
 print('\n\nElapsed time:', round(time.perf_counter() - start), 's')
