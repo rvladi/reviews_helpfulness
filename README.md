@@ -1,4 +1,8 @@
-# Reviews Helpfulness
+# Predicting the Helpfulness of Amazon User Reviews using Machine Learning and Natural Language Processing
+
+User-generated online reviews are important because they can influence purchasing decisions. On Amazon, a user may rate a review as either helpful or unhelpful. By default, Amazon sorts reviews by helpfulness and displays the most helpful reviews first. A machine learning model that predicts the helpfulness of new reviews could be a useful way of categorizing reviews that have not yet amassed helpfulness ratings.
+
+The hypothesis is that Amazon product reviews which users consider helpful share common traits that can be determined from the review text. The hypothesis is tested by training models on different sets of features and seeing which features are most predictive of review helpfulness. We train logistic regression, Naive Bayes, and SVM models on groups of features (structural, part-of-speech, emotionality, and word frequencies) extracted from Amazon reviews.
 
 ## Reviews Dataset
 
